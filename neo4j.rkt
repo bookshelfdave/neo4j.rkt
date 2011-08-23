@@ -61,7 +61,8 @@
     (get-impure-port url neo4j-request-headers)))
 
 ; exported functions
-(define (neo4j-init baseurl)
+(define (neo4j-init baseurl)  
+  (with-handlers ([(lambda (v) (begin (display v) #t)) (lambda (v) "Failed to connect!")])    
         (let* ([n4j (neo4j-server baseurl "" "" "" "" "" "" "")]
                [body (neo4j-response-body (get-neo4j-root n4j))]
                [root (json->jsexpr body)])
@@ -76,7 +77,8 @@
                        [reference_node (hash-ref root 'reference_node)]
                        [extensions_info (hash-ref root 'extensions_info)]
                        [relationship_types (hash-ref root 'relationship_types)]
-                       ))))
+                       )))))
+  
         
 (define (get-neo4j-root n4j)
   (read-response (neo4j-request-port-raw n4j "/") ""))
