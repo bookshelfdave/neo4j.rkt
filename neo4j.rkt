@@ -14,7 +14,7 @@
                       relationship_types
                       ) #:transparent )
                                     
-(struct neo4j-response (header body) #:transparent)
+(struct neo4j-response (header body status) #:transparent)
 
 (define neo4j-request-headers (list "Accept:application/json"))
 
@@ -38,13 +38,14 @@
           b)
         (read-body p (string-append b line)))))
 
-(define (read-response p r)
-  (let ([header (read-header p "")]
-        [body   (read-body p "")])
-    (neo4j-response header body)))
-
 (define (get-status-from-header header)
   (car (regexp-split #rx"\r" header)))
+
+(define (read-response p r)
+  (let* ([header (read-header p "")]
+         [body   (read-body p "")]
+         [status (get-http-status (get-status-from-header header))])
+    (neo4j-response header body status)))
 
 (define (get-http-status txt)
   (car (regexp-match* #px"\\d\\d\\d" txt)))
@@ -59,6 +60,18 @@
 (define (neo4j-request-port n4j fullpath)         
   (let ([url (string->url fullpath)])
     (get-impure-port url neo4j-request-headers)))
+
+
+(define (neo4j-post n4j url reqbody)
+  (let* 
+      ([url (string->url (neo4j-server-node n4j))]
+       [resp (read-response (post-impure-port url reqbody neo4j-post-headers) "" )])
+    resp))
+
+(define (neo4j-get n4j url)
+  "FOO"
+  )
+
 
 ; exported functions
 (define (neo4j-init baseurl)  
@@ -96,15 +109,16 @@
           [(equal? respcode "404") #f]
           [else (error (string-append "Unrecognized response from server: " respcode))])))
 
+
+
 (define (create-node n4j [props #f])
   (let* ([url (string->url (neo4j-server-node n4j))]
          [reqbody (string->bytes/locale (if (eq? props #f) ""
                                             (jsexpr->json props)))]        
-         [resp (read-response (post-impure-port url reqbody neo4j-post-headers) "" )]               
-         [body (neo4j-response-body resp)]
-         [hdr (get-status-from-header (neo4j-response-header resp))]
-         [respcode (get-http-status hdr)])
-    (cond [(equal? respcode "201") "OK"]
+         [resp (neo4j-post n4j url reqbody)]         
+         [respcode (neo4j-response-status resp)]
+         )             
+    (cond [(equal? respcode "201") (json->jsexpr (neo4j-response-body resp))]
           [(equal? respcode "400") "Invalid data sent"]
           [else (error (string-append "Unrecognized response from server: " respcode))])))        
 
