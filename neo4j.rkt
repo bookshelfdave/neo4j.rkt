@@ -2,7 +2,8 @@
 (require net/url)
 (require (planet dherman/json:3:0))
 (require net/head)
-;curl -H Accept:application/json -X POST http://localhost:7474/db/data/node
+
+; no transaction support :-(
 
 (struct neo4j-server (baseurl 
                       node 
@@ -69,11 +70,14 @@
 
 
 (define (handle-generic code msg)
-  (handle code msg (lambda (x) (error (string-append "Error: " msg ": Server returned " code " -> " x)))))
+  (handle code msg (lambda (x) msg)))
 
-(define (handle-json code msg)
-  (handle code msg json->jsexpr))
+(define (handle-error code msg)
+  (handle code msg (lambda (x) (error (string-append "Error: " msg ". Server returned " code " -> " x)))))
 
+
+(define (handle-json code)
+  (handle code "OK" json->jsexpr))
 
 (define (server-error msg)
   (lambda (x)
@@ -83,14 +87,21 @@
   (response-handlers
    ;get-root
    (handlers (handle-generic "404" "Root not found") 
-             (handle "200" "OK" json->jsexpr))
+             (handle-json "200"))
    ;create-node
-   (handlers)
+   (handlers
+    (handle-json "201")
+    )
    ;get-node  
-   (handlers (handle-generic "404" "Node not found")
-             (handle-json "200" "OK"))
+   (handlers 
+    (handle-generic "404" "Node not found")
+    (handle-json "200"))
    ;set-node-properties
-   (handlers)
+   (handlers    
+    (handle-generic "204" "OK")
+    (handle-error "400" "Invalid data sent")
+    (handle-error "404" "Node not found")    
+    )
    ;get-node-properties
    (handlers)
    ;remove-node-properties
@@ -102,7 +113,11 @@
    ;remove-node-property
    (handlers)
    ;delete-node
-   (handlers)
+   (handlers 
+    (handle-generic "204" "OK")
+    (handle-error "404" "Node not found")
+    (handle-error "409" "Node could not be deleted (still has relationships?)"))
+         
    ;create-relationship
    (handlers)
    ;set-relationship-properties
@@ -153,17 +168,16 @@
 
 
 (define neo4j-request-headers (list "Accept:application/json"))
-
-(define neo4j-post-headers (list "Content-Type:application/json"))
+(define neo4j-post-headers (list "Content-Type:application/json" "Accept:application/json"))
  
-(define (read-header p h)
-  (let ([line (read-line p)])
+(define (read-header p h)  
+  (let ([line (read-line p)])    
     (if (eof-object? line)
-        (begin
+        (begin            
           (close-input-port p)
           h)
         (if (equal? line "\r") ;/n is already stripped off
-            h                        
+            h              
             (read-header p (string-append h line))))))
 
 (define (read-body p b)
@@ -183,6 +197,12 @@
          [status (get-http-status (get-status-from-header header))])
     (neo4j-response header body status)))
 
+(define (read-response-head-only p r)
+  (let* ([header (read-header p "")]
+         [body   ""]
+         [status (get-http-status (get-status-from-header header))])
+    (neo4j-response header body status)))
+
 (define (get-http-status txt)
   (car (regexp-match* #px"\\d\\d\\d" txt)))
 
@@ -197,7 +217,7 @@
   (let ([url (string->url fullpath)])
     (get-impure-port url neo4j-request-headers)))
 
-(define (handle-response r handler-hash)        
+(define (handle-response r handler-hash)          
   (let ([respcode (neo4j-response-status r)])
     (cond [(hash-has-key? handler-hash respcode)            
            ((handler-converter (hash-ref handler-hash respcode)) (neo4j-response-body r))
@@ -205,10 +225,11 @@
           [else (string-append "Response handler not defined for status:" (neo4j-response-header r) respcode)])          
     ))
 
+
 (define (neo4j-post n4j surl reqbody handler-hash)
   (let* 
       ([url (string->url surl)]
-       [resp (read-response (post-impure-port url reqbody neo4j-post-headers) "" )])
+       [resp (read-response (post-impure-port url reqbody neo4j-post-headers) "" )])    
     (handle-response resp handler-hash)))
 
 (define (neo4j-get n4j surl handler-hash)  
@@ -217,6 +238,19 @@
        [resp (read-response (get-impure-port url neo4j-request-headers) "" )])
     (handle-response resp handler-hash)))
 
+(define (neo4j-put n4j surl reqbody handler-hash)
+  (let* 
+      ([url (string->url surl)]
+       [resp (read-response-head-only (put-impure-port url reqbody neo4j-post-headers) "" )])    
+    (handle-response resp handler-hash)))
+
+(define (neo4j-delete n4j surl handler-hash)    
+  (let* 
+      ([url (string->url surl)]
+       [resp (read-response-head-only (delete-impure-port url neo4j-request-headers) "" )])     
+      (handle-response resp handler-hash)      
+      ))
+
 
 ; exported functions
 (define (neo4j-init baseurl)  
@@ -224,8 +258,7 @@
         (let* ([n4j (neo4j-server baseurl "" "" "" "" "" "" "" default-response-handlers)]
                [body (neo4j-response-body (get-neo4j-root n4j))]
                [root (json->jsexpr body)])
-          (begin 
-            (display body)
+          (begin             
             (struct-copy neo4j-server n4j 
                        ;[root-node root]
                        [node (hash-ref root 'node)]
@@ -242,44 +275,38 @@
   (read-response (neo4j-request-port-raw n4j "/") ""))
 
 
-
 (define (get-node n4j nodeid)
   (let* ([snodeid (cond 
                     [(string? nodeid) nodeid]
                     [(integer? nodeid) (number->string nodeid)])]
          [url (string-append (neo4j-server-node n4j) "/" snodeid)])
          (neo4j-get n4j url (response-handlers-get-node (neo4j-server-handlers n4j)))))
-         
+
+
+(define (delete-node n4j nodeid)
+  (let* ([snodeid (cond 
+                    [(string? nodeid) nodeid]
+                    [(integer? nodeid) (number->string nodeid)])]
+         [url (string-append (neo4j-server-node n4j) "/" snodeid)])
+         (neo4j-delete n4j url (response-handlers-delete-node (neo4j-server-handlers n4j)))))
+
 
 (define (create-node n4j [props #f])
-  (let* ([url (string->url (neo4j-server-node n4j))]
+  (let* ([url (neo4j-server-node n4j)]
          [reqbody (string->bytes/locale (if (eq? props #f) ""
-                                            (jsexpr->json props)))]        
-         [resp (neo4j-post n4j url reqbody)]         
-         [respcode (neo4j-response-status resp)]
-         )             
-    (cond [(equal? respcode "201") (json->jsexpr (neo4j-response-body resp))]
-          [(equal? respcode "400") "Invalid data sent"]
-          [else (error (string-append "Unrecognized response from server: " respcode))])))        
-
-
+                                            (jsexpr->json props)))])    
+    (neo4j-post n4j url reqbody (response-handlers-create-node (neo4j-server-handlers n4j)))))
+        
 (define (set-node-props n4j nodeid [props #f])
-  (let* ([url0 (string-append (neo4j-server-node n4j) "/" nodeid "/properties")]
-         [url (string->url url0)]
+  (let* ([url (string-append (neo4j-server-node n4j) "/" nodeid "/properties")]         
          [reqbody (string->bytes/locale (if (eq? props #f) ""
-                                            (jsexpr->json props)))]        
-         [resp (neo4j-post n4j url reqbody)]         
-         [respcode (neo4j-response-status resp)]
-         )             
-    (cond [(equal? respcode "204") "OK"]
-          [(equal? respcode "400") "Invalid data sent"]
-          [(equal? respcode "404") "Node not found"]
-          [else (error (string-append "Unrecognized response from server: " respcode))])))        
+                                            (jsexpr->json props)))])
+    (neo4j-put n4j url reqbody (response-handlers-set-node-properties (neo4j-server-handlers n4j)))))
     
 ;(post-impure-port (string->url "http://localhost:7474/db/data/node") (string->bytes/locale testbody) neo4j-post-headers ))
 ;(get-neo4j-root (neo4j-init "http://localhost:7474/db/data"))
 ;(define r (read-response (get-neo4j-port (neo4j-init "http://localhost:7474/db/data") "/node/1") ""))
 ;(define testbody (jsexpr->json (hasheq 'name "Dave Parfitt" 'profession "Hacker")))
-;(define s (neo4j-init "http://localhost:7474/db/data"))
-
+(define s (neo4j-init "http://localhost:7474/db/data"))
+;(delete-node s 31)
 
