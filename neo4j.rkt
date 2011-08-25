@@ -136,6 +136,7 @@
          
    ;create-relationship
    (handlers)
+   
    ;set-relationship-properties
    (handlers)
    ;get-relationship-properties
@@ -350,5 +351,14 @@
   (neo4j-delete n4j url (response-handlers-remove-node-property (neo4j-server-handlers n4j)))))
 
 
-(define s (neo4j-init "http://localhost:7474/db/data"))
 
+
+(define (create-relationship n4j [props #f])
+  (let* ([url (neo4j-server-node n4j)]
+         [reqbody (string->bytes/locale (if (eq? props #f) ""
+                                            (jsexpr->json props)))])    
+    (neo4j-post n4j url reqbody (response-handlers-create-node (neo4j-server-handlers n4j)))))
+
+
+;(define s (neo4j-init "http://localhost:7474/db/data"))
+(provide neo4j-init (struct-out neo4j-server))
