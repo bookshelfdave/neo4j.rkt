@@ -103,15 +103,31 @@
     (handle-error "404" "Node not found")    
     )
    ;get-node-properties
-   (handlers)
+   (handlers
+    (handle-json "200" )
+    (handle-generic "204" "No properties found")
+    (handle-error "404" "Node not found")        
+    )      
    ;remove-node-properties
-   (handlers)
+   (handlers    
+    (handle-generic "204" "OK")
+    (handle-error "404" "Node not found")    
+    )
    ;set-node-property
-   (handlers)
+   (handlers    
+    (handle-generic "204" "OK")
+    (handle-error "404" "Node not found")    
+    )   
    ;get-node-property
-   (handlers)
+   (handlers
+    (handle-json "200")
+    (handle-error "404" "Node or property not found")
+    )
    ;remove-node-property
-   (handlers)
+   (handlers    
+    (handle-generic "204" "OK")
+    (handle-error "404" "Node or property not found")    
+    )
    ;delete-node
    (handlers 
     (handle-generic "204" "OK")
@@ -252,6 +268,11 @@
       ))
 
 
+(define (nodeid->string v)
+  (cond 
+    [(string? v) v]
+    [(integer? v) (number->string v)]))
+
 ; exported functions
 (define (neo4j-init baseurl)  
   (with-handlers ([(lambda (v) (begin (display v) #t)) (lambda (v) "Failed to connect!")])    
@@ -259,8 +280,7 @@
                [body (neo4j-response-body (get-neo4j-root n4j))]
                [root (json->jsexpr body)])
           (begin             
-            (struct-copy neo4j-server n4j 
-                       ;[root-node root]
+            (struct-copy neo4j-server n4j                        
                        [node (hash-ref root 'node)]
                        [extensions (hash-ref root 'extensions)]
                        [node_index (hash-ref root 'node_index)]
@@ -276,19 +296,15 @@
 
 
 (define (get-node n4j nodeid)
-  (let* ([snodeid (cond 
-                    [(string? nodeid) nodeid]
-                    [(integer? nodeid) (number->string nodeid)])]
+  (let* ([snodeid (nodeid->string nodeid)]
          [url (string-append (neo4j-server-node n4j) "/" snodeid)])
          (neo4j-get n4j url (response-handlers-get-node (neo4j-server-handlers n4j)))))
 
 
 (define (delete-node n4j nodeid)
-  (let* ([snodeid (cond 
-                    [(string? nodeid) nodeid]
-                    [(integer? nodeid) (number->string nodeid)])]
+  (let* ([snodeid (nodeid->string nodeid)])
          [url (string-append (neo4j-server-node n4j) "/" snodeid)])
-         (neo4j-delete n4j url (response-handlers-delete-node (neo4j-server-handlers n4j)))))
+         (neo4j-delete n4j url (response-handlers-delete-node (neo4j-server-handlers n4j))))
 
 
 (define (create-node n4j [props #f])
@@ -298,15 +314,41 @@
     (neo4j-post n4j url reqbody (response-handlers-create-node (neo4j-server-handlers n4j)))))
         
 (define (set-node-props n4j nodeid [props #f])
-  (let* ([url (string-append (neo4j-server-node n4j) "/" nodeid "/properties")]         
+  (let* ([snodeid (nodeid->string nodeid)]         
+         [url (string-append (neo4j-server-node n4j) "/" snodeid "/properties")]         
          [reqbody (string->bytes/locale (if (eq? props #f) ""
                                             (jsexpr->json props)))])
     (neo4j-put n4j url reqbody (response-handlers-set-node-properties (neo4j-server-handlers n4j)))))
-    
-;(post-impure-port (string->url "http://localhost:7474/db/data/node") (string->bytes/locale testbody) neo4j-post-headers ))
-;(get-neo4j-root (neo4j-init "http://localhost:7474/db/data"))
-;(define r (read-response (get-neo4j-port (neo4j-init "http://localhost:7474/db/data") "/node/1") ""))
-;(define testbody (jsexpr->json (hasheq 'name "Dave Parfitt" 'profession "Hacker")))
+
+(define (get-node-props n4j nodeid)
+  (let* ([snodeid (nodeid->string nodeid)]
+         [url (string-append (neo4j-server-node n4j) "/" snodeid "/properties")])
+         (neo4j-get n4j url (response-handlers-get-node-properties (neo4j-server-handlers n4j)))))
+
+(define (remove-node-props n4j nodeid)
+  (let* ([snodeid (nodeid->string nodeid)]
+         [url (string-append (neo4j-server-node n4j) "/" snodeid "/properties")])
+  (neo4j-delete n4j url (response-handlers-remove-node-properties (neo4j-server-handlers n4j)))))
+
+
+; should i take a json expr AND name + value?
+(define (set-node-prop n4j nodeid prop value)
+  (let* ([snodeid (nodeid->string nodeid)]         
+         [url (string-append (neo4j-server-node n4j) "/" snodeid "/properties/" prop)]                  
+         [reqbody (string->bytes/locale (jsexpr->json value))])
+    (neo4j-put n4j url reqbody (response-handlers-set-node-property (neo4j-server-handlers n4j)))))
+
+(define (get-node-prop n4j nodeid prop)
+  (let* ([snodeid (nodeid->string nodeid)]
+         [url (string-append (neo4j-server-node n4j) "/" snodeid "/properties/" prop)])
+         (neo4j-get n4j url (response-handlers-get-node-property (neo4j-server-handlers n4j)))))
+
+
+(define (remove-node-prop n4j nodeid prop)
+  (let* ([snodeid (nodeid->string nodeid)]
+         [url (string-append (neo4j-server-node n4j) "/" snodeid "/properties/" prop)])
+  (neo4j-delete n4j url (response-handlers-remove-node-property (neo4j-server-handlers n4j)))))
+
+
 (define s (neo4j-init "http://localhost:7474/db/data"))
-;(delete-node s 31)
 
