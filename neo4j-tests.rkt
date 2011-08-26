@@ -2,17 +2,86 @@
 (require rackunit
          "neo4j.rkt")
 
+(define conn (neo4j-init "http://localhost:7474/db/data"))
+
+(define test-node 'nil)
+(define test-node-with-props 'nil)
+
+
+;test get-root?
+
+
 (test-case
- "Connection test"
- (let ([conn (neo4j-init "http://localhost:7474/db/data")])         
-   (equal? (neo4j-server-baseurl conn) "http://localhost:7474/db/data")))
-   
-;get-root
-;create-node
-;get-node
-;set-node-properties
-;get-node-properties
-;remove-node-properties
+ "Connection" 
+   (check-equal? (neo4j-server-baseurl conn) "http://localhost:7474/db/data"))
+
+(test-case
+ "Connection fail" 
+ (check-exn
+  exn:fail?
+  (lambda (x) (neo4j-init "http://localhost:7475/db/data"))))
+
+(test-case
+ "Create Node"
+ (let ([node (create-node conn)])
+   (begin 
+     (set! test-node node)
+     (check-true (hash-has-key? node 'self)))))
+
+(test-case
+ "Create Node w/ props"
+ (let* (
+        [props (hash 'foo 1 'bar "two")]
+        [node (create-node conn props)]
+        [datanode (hash-ref node 'data)])   
+   (begin 
+     (check-true (hash-has-key? datanode 'foo))
+     (check-true (hash-has-key? datanode 'bar))
+     (set! test-node-with-props node)
+ )))
+
+
+(test-case
+ "Get Node"
+ (let* ([nodeid (get-node-id test-node)]
+        [node (get-node conn nodeid)]
+        [gnodeid (get-node-id node)])       
+   (check-equal? nodeid gnodeid)))
+
+(test-case
+ "Delete Node"
+ (let* ([nodeid (get-node-id test-node)]   
+        [dn (delete-node conn nodeid) ])                       
+     (check-exn exn:fail? (lambda (x) (get-node conn nodeid)))))
+
+(test-case
+ "Get Node Properties"
+ (let* ([nodeid (get-node-id test-node-with-props)]
+        [props  (get-node-props conn nodeid)])   
+   (begin 
+     (check-true (hash-has-key? props 'foo))
+     (check-true (hash-has-key? props 'bar))      
+     )))
+
+(test-case
+ "Set Node Properties"
+ (let* ([nodeid (get-node-id test-node-with-props)]
+        [newprops (hash 'baz "x" 'z 1)]
+        [result  (set-node-props conn nodeid newprops)]
+        [props (get-node-props conn nodeid)])  
+   (begin 
+     (check-true (hash-has-key? props 'baz))
+     (check-true (hash-has-key? props 'z))      
+     )))
+
+(test-case
+ "Remove Node Properties"
+ (let* ([nodeid (get-node-id test-node-with-props)]
+        [result (remove-node-props conn nodeid)]
+        [props (get-node-props conn nodeid)])    
+   (check-equal? (hash-count props) 0 )   
+   ))
+
 ;set-node-property
 ;get-node-property
 ;remove-node-property

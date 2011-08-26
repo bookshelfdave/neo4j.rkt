@@ -79,10 +79,15 @@
 (define (handle-json code)
   (handle code "OK" json->jsexpr))
 
+(define (handle-empty-json code)
+  (handle code "OK" (lambda (x) (hash))))
+
 (define (server-error msg)
   (lambda (x)
     (string-append "An error occurred:" msg)))
 
+
+;; TODO: How do I handle 4xx errors? exceptions?
 (define default-response-handlers
   (response-handlers
    ;get-root
@@ -94,7 +99,7 @@
     )
    ;get-node  
    (handlers 
-    (handle-generic "404" "Node not found")
+    (handle-error "404" "Node not found")
     (handle-json "200"))
    ;set-node-properties
    (handlers    
@@ -105,7 +110,7 @@
    ;get-node-properties
    (handlers
     (handle-json "200" )
-    (handle-generic "204" "No properties found")
+    (handle-empty-json "204")
     (handle-error "404" "Node not found")        
     )      
    ;remove-node-properties
@@ -303,9 +308,9 @@
 
 
 (define (delete-node n4j nodeid)
-  (let* ([snodeid (nodeid->string nodeid)])
+  (let* ([snodeid (nodeid->string nodeid)]
          [url (string-append (neo4j-server-node n4j) "/" snodeid)])
-         (neo4j-delete n4j url (response-handlers-delete-node (neo4j-server-handlers n4j))))
+         (neo4j-delete n4j url (response-handlers-delete-node (neo4j-server-handlers n4j)))))
 
 
 (define (create-node n4j [props #f])
@@ -337,7 +342,8 @@
   (let* ([snodeid (nodeid->string nodeid)]         
          [url (string-append (neo4j-server-node n4j) "/" snodeid "/properties/" prop)]                  
          [reqbody (string->bytes/locale (jsexpr->json value))])
-    (neo4j-put n4j url reqbody (response-handlers-set-node-property (neo4j-server-handlers n4j)))))
+    (neo4j-put n4j url reqbody 
+               (response-handlers-set-node-property (neo4j-server-handlers n4j)))))
 
 (define (get-node-prop n4j nodeid prop)
   (let* ([snodeid (nodeid->string nodeid)]
@@ -360,5 +366,18 @@
     (neo4j-post n4j url reqbody (response-handlers-create-node (neo4j-server-handlers n4j)))))
 
 
+(define (get-node-id node)
+  (last (regexp-split #rx"/" (hash-ref node 'self)))
+  )
+
 ;(define s (neo4j-init "http://localhost:7474/db/data"))
-(provide neo4j-init (struct-out neo4j-server))
+(provide 
+ neo4j-init 
+ create-node
+ get-node
+ delete-node
+ get-node-props
+ set-node-props
+ get-node-id
+ remove-node-props
+ (struct-out neo4j-server))
