@@ -82,8 +82,23 @@
    (check-equal? (hash-count props) 0 )   
    ))
 
-;set-node-property
-;get-node-property
+(test-case
+ "Set Node Property"
+ (let* ([nodeid (get-node-id test-node-with-props)]        
+        [result  (set-node-prop conn nodeid "prop1" 1)]
+        [props (get-node-props conn nodeid)])  
+   (begin 
+     (check-true (hash-has-key? props 'prop1))        
+     (check-true (equal? (hash-ref props 'prop1) 1)))))
+
+(test-case
+ "Get Node Property"
+ (let* ([nodeid (get-node-id test-node-with-props)]        
+        [result  (set-node-prop conn nodeid "prop1" 1)]
+        [prop (get-node-prop conn nodeid "prop1")])  
+   (begin      
+     (check-true (equal? prop 1)))))  
+
 ;remove-node-property
 ;delete-node
 ;create-relationship

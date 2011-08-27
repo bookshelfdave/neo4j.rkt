@@ -380,4 +380,6 @@
  set-node-props
  get-node-id
  remove-node-props
+ set-node-prop
+ get-node-prop
  (struct-out neo4j-server))
