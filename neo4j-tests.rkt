@@ -99,8 +99,23 @@
    (begin      
      (check-true (equal? prop 1)))))  
 
-;remove-node-property
-;delete-node
+
+(test-case
+ "Remove Node Property"
+ (let* ([nodeid (get-node-id test-node-with-props)]        
+        [result  (set-node-prop conn nodeid "prop1" 1)])           
+   (check-exn exn:fail? (lambda (x) (get-node-prop conn nodeid "prop1")))))
+
+(test-case
+ "Delete Node"
+ (let* ([node-to-delete (create-node conn)]
+        [nodeid (get-node-id node-to-delete)])
+   (begin
+     (delete-node conn nodeid)
+     (check-exn exn:fail? (lambda (x) (get-node-prop conn nodeid "prop1"))))))
+
+
+
 ;create-relationship
 ;set-relationship-properties
 ;get-relationship-properties

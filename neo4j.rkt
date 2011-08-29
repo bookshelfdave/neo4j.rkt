@@ -382,4 +382,5 @@
  remove-node-props
  set-node-prop
  get-node-prop
+ remove-node-prop
  (struct-out neo4j-server))
