@@ -61,27 +61,28 @@
 (struct handler (status description converter) #:transparent)
 
 ; define one of these for each http response code you are expecting
-(define generic-handler (lambda (x) (string-append "Generic handler:" x)))
+;(define generic-handler (lambda (x) (string-append "Generic handler:" x)))
 (define (handle status description converter)
   (handler status description converter))
 ; make a hash out of the list of handlers, using the status code as the hash key
 (define (handlers . l)
  (make-hash (map (lambda (y) (cons (handler-status y) y)) l)))
 
-
 (define (handle-generic code msg)
   (handle code msg (lambda (x) msg)))
 
 (define (handle-error code msg)
-  (handle code msg (lambda (x) (error (string-append "Error: " msg ". Server returned " code " -> " x)))))
-
+  (handle code msg (lambda (x) (error (string-append "Error: " msg ". Server returned " code ":" (neo4j-response-body x))))))
 
 (define (handle-json code)
-  (handle code "OK" json->jsexpr))
+  (handle code "OK" (lambda (x) (json->jsexpr (neo4j-response-body x)))))
 
 (define (handle-empty-json code)
   (handle code "OK" (lambda (x) (hash))))
 
+(define (handle-simple-response code)
+  (handle code "OK" (lambda (x) (neo4j-response-body x))))
+  
 (define (server-error msg)
   (lambda (x)
     (string-append "An error occurred:" msg)))
@@ -140,12 +141,23 @@
     (handle-error "409" "Node could not be deleted (still has relationships?)"))
          
    ;create-relationship
-   (handlers)
-   
+   (handlers
+    (handle-error "400" "Invalid data sent")
+    (handle-error "404" "'To' node, or the node specified by the URI not found")
+    (handle-json "201")
+    ;(handle-generic "201" "OK, a relationship was created")
+    )
+    
    ;set-relationship-properties
    (handlers)
+
    ;get-relationship-properties
-   (handlers)
+   (handlers
+    (handle-json "200")
+    (handle-empty-json "204")
+    (handle-error "404" "Relationship not found")        
+    )      
+      
    ;remove-relationship-properties
    (handlers)
    ;get-relationship-property
@@ -242,7 +254,7 @@
 (define (handle-response r handler-hash)          
   (let ([respcode (neo4j-response-status r)])
     (cond [(hash-has-key? handler-hash respcode)            
-           ((handler-converter (hash-ref handler-hash respcode)) (neo4j-response-body r))
+           ((handler-converter (hash-ref handler-hash respcode)) r)
            ]
           [else (string-append "Response handler not defined for status:" (neo4j-response-header r) respcode)])          
     ))
@@ -280,6 +292,12 @@
     [(integer? v) (number->string v)]))
 
 ; exported functions
+
+(define (get-node-id node)
+  (last (regexp-split #rx"/" (hash-ref node 'self)))
+  )
+
+
 (define (neo4j-init baseurl)  
   (with-handlers ([(lambda (v) (begin (display v) #t)) (lambda (v) "Failed to connect!")])    
         (let* ([n4j (neo4j-server baseurl "" "" "" "" "" "" "" default-response-handlers)]
@@ -358,29 +376,31 @@
 
 
 
+(define (create-relationship n4j relfrom relto reltype [reldata (hash)])
+  (let* (
+         [relfromid (nodeid->string relfrom)]
+         [reltoid (nodeid->string relto)]
+         [reltostr (string-append (neo4j-server-node n4j) "/node/" reltoid )]                             
+         [d (hash 'to reltostr 'type reltype 'data reldata)]         
+         [url (string-append (neo4j-server-node n4j) "/" relfromid "/relationships" )]
+         [reqbody (string->bytes/locale (jsexpr->json d))])    
+      (neo4j-post n4j url reqbody (response-handlers-create-relationship (neo4j-server-handlers n4j)))))
 
-(define (create-relationship n4j [props #f])
-  (let* ([url (neo4j-server-node n4j)]
-         [reqbody (string->bytes/locale (if (eq? props #f) ""
-                                            (jsexpr->json props)))])    
-    (neo4j-post n4j url reqbody (response-handlers-create-node (neo4j-server-handlers n4j)))))
-
-
-(define (get-node-id node)
-  (last (regexp-split #rx"/" (hash-ref node 'self)))
-  )
-
-;(define s (neo4j-init "http://localhost:7474/db/data"))
 (provide 
  neo4j-init 
+ get-node-id
  create-node
  get-node
  delete-node
  get-node-props
  set-node-props
- get-node-id
  remove-node-props
  set-node-prop
  get-node-prop
  remove-node-prop
+ create-relationship
+ ;get-relationship-properties
  (struct-out neo4j-server))
+
+
+;(define s (neo4j-init "http://localhost:7474/db/data"))

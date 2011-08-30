@@ -6,6 +6,8 @@
 
 (define test-node 'nil)
 (define test-node-with-props 'nil)
+(define rel-node-1 'nil)
+(define rel-node-2 'nil)
 
 
 ;test get-root?
@@ -113,6 +115,36 @@
    (begin
      (delete-node conn nodeid)
      (check-exn exn:fail? (lambda (x) (get-node-prop conn nodeid "prop1"))))))
+
+
+(test-case
+ "Create Relationship"
+ (let* ([rn1 (create-node conn)]        
+        [rn2 (create-node conn)]        
+        [rn1id (get-node-id rn1)]
+        [rn2id (get-node-id rn2)]
+        [reltype "RELTEST"]
+        [reldata (hash 'rd "RELDATA")]
+        [newrel (create-relationship conn rn1id rn2id reltype reldata)]
+        )
+   (begin
+     ;(display (string-append "Source node " rn1id " "))
+     ;(display (string-append "Dest node " rn2id))
+     (check-true (hash-has-key? newrel 'data))         
+     (set! rel-node-1 rn1)
+     (set! rel-node-2 rn2)     
+     )))
+(display (string-append "Relationship node source:" (get-node-id rel-node-1)))
+(display (string-append "Relationship node source:" (get-node-id rel-node-2)))
+(test-case
+ "Get Relationship Properties"
+ (let* ([nodeid (get-node-id test-node-with-props)])       
+   1))
+
+(test-case
+ "Set Relationship Properties"
+ (let* ([nodeid (get-node-id test-node-with-props)])  
+   1))
 
 
 
