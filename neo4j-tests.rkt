@@ -6,9 +6,9 @@
 
 (define test-node 'nil)
 (define test-node-with-props 'nil)
-(define rel-node-1 'nil)
-(define rel-node-2 'nil)
-
+(define test-rel-node-1 'nil)
+(define test-rel-node-2 'nil)
+(define test-rel 'nil)
 
 ;test get-root?
 
@@ -129,35 +129,81 @@
         )
    (begin
      ;(display (string-append "Source node " rn1id " "))
-     ;(display (string-append "Dest node " rn2id))
+     ;(display (string-append "Dest node " rn2id))     
      (check-true (hash-has-key? newrel 'data))         
-     (set! rel-node-1 rn1)
-     (set! rel-node-2 rn2)     
+     (set! test-rel-node-1 rn1)
+     (set! test-rel-node-2 rn2)     
+     (set! test-rel newrel)
      )))
-(display (string-append "Relationship node source:" (get-node-id rel-node-1)))
-(display (string-append "Relationship node source:" (get-node-id rel-node-2)))
+
+(display (string-append "Relationship node from:" (get-node-id test-rel-node-1) "\n"))
+(display (string-append "Relationship node to:" (get-node-id test-rel-node-2) "\n"))
+(display (string-append "[" (get-rel-id test-rel) "]" "\n"))
+
 (test-case
  "Get Relationship Properties"
- (let* ([nodeid (get-node-id test-node-with-props)])       
-   1))
+ (let* ([relid (get-rel-id test-rel)]
+        [props (get-rel-props conn relid)])
+   (begin
+     (check-true (hash-has-key? props 'rd))
+     (check-true (equal? (hash-ref props 'rd) "RELDATA")))))
 
 (test-case
  "Set Relationship Properties"
- (let* ([nodeid (get-node-id test-node-with-props)])  
-   1))
+ (let* ([relid (get-rel-id test-rel)]
+        [nop (set-rel-props conn relid (hash 'newprop 123))]
+        [props (get-rel-props conn relid)])
+   (begin
+     (check-true (hash-has-key? props 'newprop))
+     (check-true (equal? (hash-ref props 'newprop) 123)))))
 
 
+(test-case
+ "Remove Relationship Properties"
+ (let* ([relid (get-rel-id test-rel)]
+        [nop (remove-rel-props conn relid)]
+        [props (get-rel-props conn relid)])
+   (check-equal? (hash-count props) 0 )))   
 
-;create-relationship
-;set-relationship-properties
-;get-relationship-properties
-;remove-relationship-properties
-;get-relationship-property
-;set-relationship-property
-;remove-relationship-property
-;delete-relationship
+
+(test-case
+ "Get Relationship Property"
+ (let* ([relid (get-rel-id test-rel)]
+        [nop (set-rel-props conn relid (hash 'newprop 456))]
+        [prop (get-rel-prop conn relid "newprop")])
+   (check-equal? prop 456)))
+                     
+
+(test-case
+ "Set Relationship Property"
+ (let* ([relid (get-rel-id test-rel)]
+        [nop (set-rel-prop conn relid "newprop" 100)]
+        [prop (get-rel-prop conn relid "newprop")])
+   (check-equal? prop 100)))
+     
+(test-case
+ "Remove Relationship Property"
+ (let* ([relid (get-rel-id test-rel)]        
+        [prop (remove-rel-prop conn relid "newprop")])           
+        (check-exn exn:fail? (lambda (x) (get-rel-prop conn relid "newprop")))))
+
+
+(test-case
+ "Delete Relationship"
+ (let* ([relid (get-rel-id test-rel)])        
+   (begin
+     (delete-rel conn relid)
+        (check-exn exn:fail? (lambda (x) (get-rel-prop conn relid "x"))))))
+
+
+(test-case
+ "Get Relationship Types"
+ (let* ([reltypes (get-rel-types conn)])        
+   (check-equal? (car reltypes) "RELTEST")))
+
+
 ;get-node-relationship
-;get-relationship-types
+
 ;create-index
 ;delete-index
 ;list-node-indexes

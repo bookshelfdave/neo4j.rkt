@@ -114,16 +114,20 @@
     (handle-empty-json "204")
     (handle-error "404" "Node not found")        
     )      
+   
    ;remove-node-properties
    (handlers    
     (handle-generic "204" "OK")
     (handle-error "404" "Node not found")    
     )
+   
    ;set-node-property
    (handlers    
     (handle-generic "204" "OK")
+    (handle-error "400" "Invalid data sent")    
     (handle-error "404" "Node not found")    
     )   
+   
    ;get-node-property
    (handlers
     (handle-json "200")
@@ -149,7 +153,11 @@
     )
     
    ;set-relationship-properties
-   (handlers)
+   (handlers    
+    (handle-generic "204" "OK")
+    (handle-error "400" "Invalid data sent")
+    (handle-error "404" "Relationship not found")    
+    )
 
    ;get-relationship-properties
    (handlers
@@ -159,19 +167,44 @@
     )      
       
    ;remove-relationship-properties
-   (handlers)
+   (handlers    
+    (handle-generic "204" "OK")
+    (handle-error "404" "Relationship not found")    
+    )
    ;get-relationship-property
-   (handlers)
+   (handlers
+    (handle-json "200")
+    (handle-error "404" "Relationship or property not found")
+    )
+     
    ;set-relationship-property
-   (handlers)
+   (handlers    
+    (handle-generic "204" "OK")
+    (handle-error "400" "Invalid data sent")    
+    (handle-error "404" "Relationship not found")    
+    )   
+   
    ;remove-relationship-property
-   (handlers)
+   (handlers    
+    (handle-generic "204" "OK")
+    (handle-error "404" "Relationship or property not found")    
+    )
+   
    ;delete-relationship
-   (handlers)
+   (handlers 
+    (handle-generic "204" "OK")
+    (handle-error "404" "Relationship not found"))
+
    ;get-node-relationship
-   (handlers)
+   (handlers
+    (handle-json "200")
+    (handle-error "404" "Node not found")
+    )
+      
    ;get-relationship-types
-   (handlers)
+   (handlers
+    (handle-json "200")
+    )
    ;create-index
    (handlers)
    ;delete-index
@@ -297,6 +330,11 @@
   (last (regexp-split #rx"/" (hash-ref node 'self)))
   )
 
+(define (get-rel-id node)
+  (last (regexp-split #rx"/" (hash-ref node 'self)))
+  )
+
+
 
 (define (neo4j-init baseurl)  
   (with-handlers ([(lambda (v) (begin (display v) #t)) (lambda (v) "Failed to connect!")])    
@@ -386,20 +424,106 @@
          [reqbody (string->bytes/locale (jsexpr->json d))])    
       (neo4j-post n4j url reqbody (response-handlers-create-relationship (neo4j-server-handlers n4j)))))
 
+
+
+(define (get-rel-props n4j relid)
+  (let* ([srelid (nodeid->string relid)]         
+         [url (string-append (neo4j-server-baseurl n4j) "/relationship/" relid "/properties")])
+    (begin 
+      (display url)      
+      (neo4j-get n4j url (response-handlers-get-relationship-properties (neo4j-server-handlers n4j))))))
+
+
+(define (set-rel-props n4j relid [props #f])
+  (let* ([srelid (nodeid->string relid)]         
+         [url (string-append (neo4j-server-baseurl n4j) "/relationship/" srelid "/properties")]         
+         [reqbody (string->bytes/locale (if (eq? props #f) ""
+                                            (jsexpr->json props)))])
+    (neo4j-put n4j url reqbody (response-handlers-set-relationship-properties (neo4j-server-handlers n4j)))))
+
+
+(define (remove-rel-props n4j relid)
+  (let* ([srelid (nodeid->string relid)]
+         [url (string-append (neo4j-server-baseurl n4j) "/relationship/" srelid "/properties")])
+  (neo4j-delete n4j url (response-handlers-remove-relationship-properties (neo4j-server-handlers n4j)))))
+
+;; TODO: Clean up specifying a property name and value
+(define (get-rel-prop n4j relid prop)
+  (let* ([srelid (nodeid->string relid)]
+         [url (string-append (neo4j-server-baseurl n4j) "/relationship/" srelid "/properties/" prop)])
+         (neo4j-get n4j url (response-handlers-get-relationship-property (neo4j-server-handlers n4j)))))
+
+;; TODO: Clean up specifying a property name and value
+(define (set-rel-prop n4j relid prop value)
+  (let* ([srelid (nodeid->string relid)]         
+         [url (string-append (neo4j-server-baseurl n4j) "/relationship/" srelid "/properties/" prop)]                  
+         [reqbody (string->bytes/locale (jsexpr->json value))])
+    (neo4j-put n4j url reqbody 
+               (response-handlers-set-relationship-property (neo4j-server-handlers n4j)))))
+
+(define (remove-rel-prop n4j relid prop)
+  (let* ([srelid (nodeid->string relid)]
+         [url (string-append (neo4j-server-baseurl n4j) "/relationship/" srelid "/properties/" prop)])
+  (neo4j-delete n4j url (response-handlers-remove-relationship-property (neo4j-server-handlers n4j)))))
+
+
+(define (delete-rel n4j relid)
+  (let* ([srelid (nodeid->string relid)]
+         [url (string-append (neo4j-server-baseurl n4j) "/relationship/" srelid)])
+         (neo4j-delete n4j url (response-handlers-delete-node (neo4j-server-handlers n4j)))))
+
+
+(define (get-rel-types n4j)
+  (let* ([url (string-append (neo4j-server-baseurl n4j) "/relationship/types")])
+         (neo4j-get n4j url (response-handlers-get-relationship-property (neo4j-server-handlers n4j)))))
+
+
+
+(define (get-node-rel-all n4j nodeid)
+  (get-node-rel n4j nodeid "all"))
+
+(define (get-node-rel-in n4j nodeid)
+  (get-node-rel n4j nodeid "in"))
+
+(define (get-node-rel-out n4j nodeid)
+  (get-node-rel n4j nodeid "out"))
+
+(define (get-node-rel n4j nodeid type)
+  "/node/123/relationships/{dir}/{-list|&|types}"
+  )
+  
 (provide 
  neo4j-init 
  get-node-id
+ get-rel-id
+ 
  create-node
  get-node
  delete-node
+ 
  get-node-props
  set-node-props
  remove-node-props
  set-node-prop
  get-node-prop
  remove-node-prop
+ 
  create-relationship
- ;get-relationship-properties
+ get-rel-props
+ set-rel-props
+ remove-rel-props 
+ 
+ get-rel-prop
+ set-rel-prop
+ remove-rel-prop
+ delete-rel
+ 
+ get-rel-types
+ 
+ get-node-rel-all
+ get-node-rel-in
+ get-node-rel-out
+ 
  (struct-out neo4j-server))
 
 
