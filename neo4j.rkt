@@ -72,10 +72,18 @@
   (handle code msg (lambda (x) msg)))
 
 (define (handle-error code msg)
-  (handle code msg (lambda (x) (error (string-append "Error: " msg ". Server returned " code ":" (neo4j-response-body x))))))
+  (handle code msg (lambda (x) 
+                     (error 
+                      (string-append "Error: " msg ". Server returned " code ":" (neo4j-response-body x))))))
 
 (define (handle-json code)
-  (handle code "OK" (lambda (x) (json->jsexpr (neo4j-response-body x)))))
+  (handle code "OK" 
+          (lambda (x)                           
+            ; i suppose i should make this a bit more robust...
+              (if (equal? (neo4j-response-body x) "[ ]")
+                  ; json->jsexpr blows up on [ ] instead of []
+                  (json->jsexpr "[]") 
+                  (json->jsexpr (neo4j-response-body x))))))
 
 (define (handle-empty-json code)
   (handle code "OK" (lambda (x) (hash))))
@@ -100,8 +108,9 @@
     )
    ;get-node  
    (handlers 
+    (handle-json "200")
     (handle-error "404" "Node not found")
-    (handle-json "200"))
+    )
    ;set-node-properties
    (handlers    
     (handle-generic "204" "OK")
@@ -475,23 +484,28 @@
 
 (define (get-rel-types n4j)
   (let* ([url (string-append (neo4j-server-baseurl n4j) "/relationship/types")])
-         (neo4j-get n4j url (response-handlers-get-relationship-property (neo4j-server-handlers n4j)))))
+    (neo4j-get n4j url (response-handlers-get-relationship-property (neo4j-server-handlers n4j)))))
 
 
 
-(define (get-node-rel-all n4j nodeid)
-  (get-node-rel n4j nodeid "all"))
+(define (get-node-rel-all n4j nodeid reltypes)
+  (get-node-rel n4j nodeid "all" reltypes))
 
-(define (get-node-rel-in n4j nodeid)
-  (get-node-rel n4j nodeid "in"))
+(define (get-node-rel-in n4j nodeid reltypes)
+  (get-node-rel n4j nodeid "in" reltypes))
 
-(define (get-node-rel-out n4j nodeid)
-  (get-node-rel n4j nodeid "out"))
+(define (get-node-rel-out n4j nodeid reltypes)
+  (get-node-rel n4j nodeid "out" reltypes))
 
-(define (get-node-rel n4j nodeid type)
-  "/node/123/relationships/{dir}/{-list|&|types}"
-  )
-  
+(define (get-node-rel n4j nodeid inouttype reltypes)
+  ;"/node/123/relationships/{dir}/{-list|&|types}"
+  (let* ([snodeid (nodeid->string nodeid)]
+         [reltypelist (if (null? reltypes) 
+                          ""
+                          (string-append "/" (string-join reltypes "&")))]
+         [url (string-append (neo4j-server-node n4j) "/" snodeid "/relationships/" inouttype reltypelist)])
+    (neo4j-get n4j url (response-handlers-get-node-relationship (neo4j-server-handlers n4j)))))
+    
 (provide 
  neo4j-init 
  get-node-id

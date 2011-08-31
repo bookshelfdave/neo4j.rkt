@@ -23,8 +23,7 @@
   exn:fail?
   (lambda (x) (neo4j-init "http://localhost:7475/db/data"))))
 
-(test-case
- "Create Node"
+(test-case "Create Node"
  (let ([node (create-node conn)])
    (begin 
      (set! test-node node)
@@ -202,7 +201,24 @@
    (check-equal? (car reltypes) "RELTEST")))
 
 
-;get-node-relationship
+(test-case
+ "Get Node Relationship - ALL"
+ (let* ([rn1 (create-node conn)]        
+        [rn2 (create-node conn)]        
+        [rn1id (get-node-id rn1)]
+        [rn2id (get-node-id rn2)]
+        [reltype "XYZ"]
+        [reldata (hash 'rd "RELDATA")]
+        [newrel (create-relationship conn rn1id rn2id reltype reldata)]
+        [nr (get-node-rel-all conn rn1id '())]
+        )
+   (begin
+     (display (string-append "Source node " rn1id " "))
+     (display (string-append "Dest node " rn2id))     
+     (display nr)          
+     (check-true (hash-has-key? (car nr) 'start))
+     (check-equal? rn1id 
+                   (last (regexp-split #rx"/" (hash-ref (car nr) 'start)))))))
 
 ;create-index
 ;delete-index
