@@ -135,9 +135,9 @@
      (set! test-rel newrel)
      )))
 
-(display (string-append "Relationship node from:" (get-node-id test-rel-node-1) "\n"))
-(display (string-append "Relationship node to:" (get-node-id test-rel-node-2) "\n"))
-(display (string-append "[" (get-rel-id test-rel) "]" "\n"))
+;(display (string-append "Relationship node from:" (get-node-id test-rel-node-1) "\n"))
+;(display (string-append "Relationship node to:" (get-node-id test-rel-node-2) "\n"))
+;(display (string-append "[" (get-rel-id test-rel) "]" "\n"))
 
 (test-case
  "Get Relationship Properties"
@@ -213,12 +213,54 @@
         [nr (get-node-rel-all conn rn1id '())]
         )
    (begin
-     (display (string-append "Source node " rn1id " "))
-     (display (string-append "Dest node " rn2id))     
-     (display nr)          
+     ;(display (string-append "Source node " rn1id " "))
+     ;(display (string-append "Dest node " rn2id))     
+     ;(display nr)          
      (check-true (hash-has-key? (car nr) 'start))
      (check-equal? rn1id 
-                   (last (regexp-split #rx"/" (hash-ref (car nr) 'start)))))))
+                   (last 
+                    (regexp-split #rx"/" (hash-ref (car nr) 'start)))))))
+
+(test-case
+ "Get Node Relationship - OUT"
+ (let* ([rn1 (create-node conn)]        
+        [rn2 (create-node conn)]        
+        [rn1id (get-node-id rn1)]
+        [rn2id (get-node-id rn2)]
+        [reltype "XYZ"]
+        [reldata (hash 'rd "RELDATA")]
+        [newrel (create-relationship conn rn1id rn2id reltype reldata)]
+        [nr (get-node-rel-out conn rn1id '())]
+        )
+   (begin
+     (check-true (hash-has-key? (car nr) 'start))
+     (check-equal? rn1id 
+                   (last 
+                    (regexp-split #rx"/" (hash-ref (car nr) 'start))))
+     (check-equal? rn2id 
+                   (last 
+                    (regexp-split #rx"/" (hash-ref (car nr) 'end)))))))
+
+
+(test-case
+ "Get Node Relationship - IN"
+ (let* ([rn1 (create-node conn)]        
+        [rn2 (create-node conn)]        
+        [rn1id (get-node-id rn1)]
+        [rn2id (get-node-id rn2)]
+        [reltype "XYZ"]
+        [reldata (hash 'rd "RELDATA")]
+        [newrel (create-relationship conn rn1id rn2id reltype reldata)]
+        [nr (get-node-rel-in conn rn2id '())]
+        )
+   (begin
+     (check-true (hash-has-key? (car nr) 'start))
+     (check-equal? rn1id 
+                   (last 
+                    (regexp-split #rx"/" (hash-ref (car nr) 'start))))
+     (check-equal? rn2id 
+                   (last 
+                    (regexp-split #rx"/" (hash-ref (car nr) 'end)))))))
 
 ;create-index
 ;delete-index

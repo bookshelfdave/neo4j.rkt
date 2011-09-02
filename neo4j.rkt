@@ -3,7 +3,9 @@
 (require (planet dherman/json:3:0))
 (require net/head)
 
+; TODO:
 ; no transaction support :-(
+; need a get_rel_id fn
 
 (struct neo4j-server (baseurl 
                       node 
@@ -42,6 +44,7 @@
                           list-node-indexes
                           list-relationship-indexes
                           index_node
+                          index_relationship
                           index_remove_items
                           index_remove_items_completely
                           index_search_keyval
@@ -214,6 +217,7 @@
    (handlers
     (handle-json "200")
     )
+   
    ;create-index
    (handlers)
    ;delete-index
@@ -223,6 +227,8 @@
    ;list-relationship-indexes
    (handlers)
    ;index_node
+   (handlers)
+   ;index_relationship
    (handlers)
    ;index_remove_items
    (handlers)
@@ -487,7 +493,6 @@
     (neo4j-get n4j url (response-handlers-get-relationship-property (neo4j-server-handlers n4j)))))
 
 
-
 (define (get-node-rel-all n4j nodeid reltypes)
   (get-node-rel n4j nodeid "all" reltypes))
 
@@ -498,13 +503,14 @@
   (get-node-rel n4j nodeid "out" reltypes))
 
 (define (get-node-rel n4j nodeid inouttype reltypes)
-  ;"/node/123/relationships/{dir}/{-list|&|types}"
   (let* ([snodeid (nodeid->string nodeid)]
          [reltypelist (if (null? reltypes) 
                           ""
                           (string-append "/" (string-join reltypes "&")))]
-         [url (string-append (neo4j-server-node n4j) "/" snodeid "/relationships/" inouttype reltypelist)])
-    (neo4j-get n4j url (response-handlers-get-node-relationship (neo4j-server-handlers n4j)))))
+         [url (string-append 
+               (neo4j-server-node n4j) "/" snodeid "/relationships/" inouttype reltypelist)])
+    (neo4j-get n4j url 
+               (response-handlers-get-node-relationship (neo4j-server-handlers n4j)))))
     
 (provide 
  neo4j-init 
