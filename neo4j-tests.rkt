@@ -15,13 +15,15 @@
 
 (test-case
  "Connection" 
-   (check-equal? (neo4j-server-baseurl conn) "http://localhost:7474/db/data"))
+   (check-equal? 
+    (neo4j-server-baseurl conn) "http://localhost:7474/db/data"))
 
 (test-case
  "Connection fail" 
  (check-exn
   exn:fail?
-  (lambda (x) (neo4j-init "http://localhost:7475/db/data"))))
+  (lambda (x) 
+    (neo4j-init "http://localhost:7475/db/data"))))
 
 (test-case "Create Node"
  (let ([node (create-node conn)])
@@ -105,7 +107,8 @@
  "Remove Node Property"
  (let* ([nodeid (get-node-id test-node-with-props)]        
         [result  (set-node-prop conn nodeid "prop1" 1)])           
-   (check-exn exn:fail? (lambda (x) (get-node-prop conn nodeid "prop1")))))
+   (check-exn exn:fail? 
+              (lambda (x) (get-node-prop conn nodeid "prop1")))))
 
 (test-case
  "Delete Node"
@@ -113,7 +116,8 @@
         [nodeid (get-node-id node-to-delete)])
    (begin
      (delete-node conn nodeid)
-     (check-exn exn:fail? (lambda (x) (get-node-prop conn nodeid "prop1"))))))
+     (check-exn exn:fail? 
+                (lambda (x) (get-node-prop conn nodeid "prop1"))))))
 
 
 (test-case
