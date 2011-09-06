@@ -39,7 +39,8 @@
                            delete-relationship
                            get-node-relationship
                            get-relationship-types
-                           create-index
+                           create-node-index
+                           create-relationship-index
                            delete-index
                            list-node-indexes
                            list-relationship-indexes
@@ -157,32 +158,30 @@
    (handlers 
     (handle-generic "204" "OK")
     (handle-error "404" "Node not found")
-    (handle-error "409" 
-                  "Node could not be deleted (still has relationships?)"))
-   
+    (handle-error "409" "Node could not be deleted (still has relationships?)"))
+         
    ;create-relationship
    (handlers
     (handle-error "400" "Invalid data sent")
-    (handle-error "404" 
-                  "'To' node, or the node specified by the URI not found")
+    (handle-error "404" "'To' node, or the node specified by the URI not found")
     (handle-json "201")
     ;(handle-generic "201" "OK, a relationship was created")
     )
-   
+    
    ;set-relationship-properties
    (handlers    
     (handle-generic "204" "OK")
     (handle-error "400" "Invalid data sent")
     (handle-error "404" "Relationship not found")    
     )
-   
+
    ;get-relationship-properties
    (handlers
     (handle-json "200")
     (handle-empty-json "204")
     (handle-error "404" "Relationship not found")        
     )      
-   
+      
    ;remove-relationship-properties
    (handlers    
     (handle-generic "204" "OK")
@@ -193,7 +192,7 @@
     (handle-json "200")
     (handle-error "404" "Relationship or property not found")
     )
-   
+     
    ;set-relationship-property
    (handlers    
     (handle-generic "204" "OK")
@@ -211,26 +210,39 @@
    (handlers 
     (handle-generic "204" "OK")
     (handle-error "404" "Relationship not found"))
-   
+
    ;get-node-relationship
    (handlers
     (handle-json "200")
     (handle-error "404" "Node not found")
     )
-   
+      
    ;get-relationship-types
    (handlers
     (handle-json "200")
     )
    
-   ;create-index
-   (handlers)
+   ;create-node-index
+   (handlers
+    (handle-json "201")
+    )
+   ;create-relationship-index
+   (handlers
+    (handle-json "201")
+    )
+      
    ;delete-index
    (handlers)
    ;list-node-indexes
-   (handlers)
+   (handlers
+    (handle-json "200")
+    (handle-empty-json "204")
+    )
    ;list-relationship-indexes
-   (handlers)
+   (handlers
+    (handle-json "200")
+    (handle-empty-json "204")
+    )
    ;index_node
    (handlers)
    ;index_relationship
@@ -353,7 +365,7 @@
   (cond 
     [(string? v) v]
     [(integer? v) (number->string v)]))
-\
+
 ; exported functions
 
 (define (get-node-id node)
@@ -590,6 +602,54 @@
                (response-handlers-get-node-relationship 
                 (neo4j-server-handlers n4j)))))
 
+
+; index functions
+(define (get-node-indexes n4j)
+  (let* ([url (string-append 
+               (neo4j-server-baseurl n4j) "/index/node" )])
+    (neo4j-get n4j url 
+               (response-handlers-list-node-indexes 
+                (neo4j-server-handlers n4j)))))
+
+(define (get-rel-indexes n4j)
+  (let* ([url (string-append 
+               (neo4j-server-baseurl n4j) "/index/relationship" )])
+    (neo4j-get n4j url 
+               (response-handlers-list-relationship-indexes 
+                (neo4j-server-handlers n4j)))))
+
+
+; double check default hash param
+(define (create-node-index n4j name (config (hash)))
+  (let* ([url (string-append (neo4j-server-baseurl n4j)
+                             "/index/node")]
+         [r (if (eq? (hash-count config) 0)                
+                (hash 'name name)
+                (hash 'name name 'config config)
+                )]
+         [reqbody (string->bytes/locale                    
+                   (jsexpr->json r))])                 
+      (neo4j-post n4j url reqbody 
+                  (response-handlers-create-node-index
+                   (neo4j-server-handlers n4j)))))
+  
+
+
+; TODO: double check custom configs are working
+(define (create-rel-index n4j name (config (hash)))
+  (let* ([url (string-append (neo4j-server-baseurl n4j)
+                             "/index/relationship")]
+         [r (if (eq? (hash-count config) 0)                
+                (hash 'name name)
+                (hash 'name name 'config config)
+                )]
+         [reqbody (string->bytes/locale                    
+                   (jsexpr->json r))])                     
+      (neo4j-post n4j url reqbody 
+                  (response-handlers-create-relationship-index
+                   (neo4j-server-handlers n4j)))))
+
+
 (provide 
  neo4j-init 
  get-node-id
@@ -621,6 +681,12 @@
  get-node-rel-all
  get-node-rel-in
  get-node-rel-out
+ 
+ get-node-indexes
+ get-rel-indexes
+ 
+ create-node-index
+ create-rel-index
  
  (struct-out neo4j-server))
 

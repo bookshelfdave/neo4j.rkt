@@ -266,10 +266,26 @@
                    (last 
                     (regexp-split #rx"/" (hash-ref (car nr) 'end)))))))
 
-;create-index
+(test-case
+ "Create Node Index"
+ 1)
+
+(test-case
+ "Create Relationship Index"
+ 1)
+
+(test-case 
+ "Get Node Indexes"
+ (get-node-indexes conn)
+ )
+
+(test-case
+ "Get Relationship Indexes" 
+ (get-rel-indexes conn)
+ )
+
+
 ;delete-index
-;list-node-indexes
-;list-relationship-indexes
 ;index_node
 ;index_remove_items
 ;index_remove_items_completely
