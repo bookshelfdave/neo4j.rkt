@@ -232,7 +232,10 @@
     )
       
    ;delete-index
-   (handlers)
+   (handlers
+    (handle-generic "204" "OK")
+    )
+   
    ;list-node-indexes
    (handlers
     (handle-json "200")
@@ -649,6 +652,19 @@
                   (response-handlers-create-relationship-index
                    (neo4j-server-handlers n4j)))))
 
+(define (delete-index n4j path)
+  (let* ([url (string-append 
+               (neo4j-server-baseurl n4j) "/" path)])
+    (neo4j-delete n4j url 
+                  (response-handlers-delete-index
+                   (neo4j-server-handlers n4j)))))
+
+  
+(define (delete-node-index n4j index)
+  (delete-index n4j (string-append "index/node/" index)))
+
+(define (delete-rel-index n4j index)
+  (delete-index n4j (string-append "index/relationship/" index)))
 
 (provide 
  neo4j-init 
@@ -688,6 +704,8 @@
  create-node-index
  create-rel-index
  
+ delete-node-index
+ delete-rel-index
  (struct-out neo4j-server))
 
 

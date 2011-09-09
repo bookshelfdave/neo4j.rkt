@@ -284,8 +284,10 @@
  (get-rel-indexes conn)
  )
 
+ ;delete-node-index
+ ;delete-rel-index
+ 
 
-;delete-index
 ;index_node
 ;index_remove_items
 ;index_remove_items_completely
