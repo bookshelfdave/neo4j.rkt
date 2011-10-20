@@ -44,15 +44,15 @@
                            delete-index
                            list-node-indexes
                            list-relationship-indexes
-                           index_node
-                           index_relationship
-                           index_remove_items
-                           index_remove_items_completely
-                           index_search_keyval
-                           index_search_query
+                           index-node
+                           index-relationship
+                           index-remove-items
+                           index-remove-items-completely
+                           index-search-keyval
+                           index-search-query
                            traverse
-                           path_between_nodes
-                           paths_between_nodes                          
+                           path-between-nodes
+                           paths-between-nodes                          
                            ))
 
 
@@ -247,7 +247,9 @@
     (handle-empty-json "204")
     )
    ;index_node
-   (handlers)
+   (handlers
+    (handle-json "201")
+    )
    ;index_relationship
    (handlers)
    ;index_remove_items
@@ -334,7 +336,7 @@
                  respcode)])))
 
 
-(define (neo4j-post n4j surl reqbody handler-hash)
+(define (neo4j-post n4j surl reqbody handler-hash)  
   (let* 
       ([url (string->url surl)]
        [resp (read-response 
@@ -665,6 +667,30 @@
 
 (define (delete-rel-index n4j index)
   (delete-index n4j (string-append "index/relationship/" index)))
+
+; '#hasheq((template . "http://localhost:7474/db/data/index/node/DavesIndex/{key}/{value}"))
+; http://localhost:7474/db/data/index/node
+; http://localhost:7474/db/data/index/node/Status/{key}/{value}
+; http://localhost:7474/db/data/index/node/User/{key}/{value}
+; /index/node/my_nodes/the_key/the_value
+
+; TODO: MAKE INDEX KEY AND VALUES URL SAFE
+(define (index-node n4j idxname nodeid k)
+  (let* (
+         [idxval (number->string (get-node-prop n4j nodeid k))]
+         [url (string-append (neo4j-server-baseurl n4j)
+                             "/index/node/" idxname "/" k "/" idxval)]         
+         [nodeurl (string-append "\"" (neo4j-server-baseurl n4j) "/node/" nodeid "\"")]
+         [reqbody (string->bytes/locale nodeurl)])
+    (begin
+      (display (string-append "[" idxval "]\n"))
+      (display (string-append "<" url ">\n"))
+      (display (string-append "{" nodeurl "}\n" ))
+      (neo4j-post n4j url reqbody 
+                  (response-handlers-index-node
+                   (neo4j-server-handlers n4j))))))
+
+
 
 (provide 
  neo4j-init 
