@@ -251,7 +251,9 @@
     (handle-json "201")
     )
    ;index_relationship
-   (handlers)
+   (handlers
+    (handle-json "201")
+    )
    ;index_remove_items
    (handlers)
    ;index_remove_items_completely
@@ -370,6 +372,12 @@
   (cond 
     [(string? v) v]
     [(integer? v) (number->string v)]))
+
+(define (relid->string v)
+  (cond 
+    [(string? v) v]
+    [(integer? v) (number->string v)]))
+
 
 ; exported functions
 
@@ -668,29 +676,27 @@
 (define (delete-rel-index n4j index)
   (delete-index n4j (string-append "index/relationship/" index)))
 
-; '#hasheq((template . "http://localhost:7474/db/data/index/node/DavesIndex/{key}/{value}"))
-; http://localhost:7474/db/data/index/node
-; http://localhost:7474/db/data/index/node/Status/{key}/{value}
-; http://localhost:7474/db/data/index/node/User/{key}/{value}
-; /index/node/my_nodes/the_key/the_value
-
 ; TODO: MAKE INDEX KEY AND VALUES URL SAFE
+; TODO: IDXVALUE is using NUMBER->STRING!
 (define (index-node n4j idxname nodeid k)
-  (let* (
-         [idxval (number->string (get-node-prop n4j nodeid k))]
+  (let* ([idxval (number->string (get-node-prop n4j nodeid k))]
          [url (string-append (neo4j-server-baseurl n4j)
                              "/index/node/" idxname "/" k "/" idxval)]         
          [nodeurl (string-append "\"" (neo4j-server-baseurl n4j) "/node/" nodeid "\"")]
-         [reqbody (string->bytes/locale nodeurl)])
-    (begin
-      (display (string-append "[" idxval "]\n"))
-      (display (string-append "<" url ">\n"))
-      (display (string-append "{" nodeurl "}\n" ))
+         [reqbody (string->bytes/locale nodeurl)])    
       (neo4j-post n4j url reqbody 
                   (response-handlers-index-node
-                   (neo4j-server-handlers n4j))))))
-
-
+                   (neo4j-server-handlers n4j)))))
+; TODO: Need to be consistent w/ NodeID and RelID types (string/int etc)
+(define (index-rel n4j idxname relid k)
+  (let* ([idxval (get-rel-prop n4j relid k)]
+         [url (string-append (neo4j-server-baseurl n4j)
+                             "/index/relationship/" idxname "/" k "/" idxval)]         
+         [nodeurl (string-append "\"" (neo4j-server-baseurl n4j) "/relationship/" relid "\"")]
+         [reqbody (string->bytes/locale nodeurl)])    
+      (neo4j-post n4j url reqbody 
+                  (response-handlers-index-relationship
+                   (neo4j-server-handlers n4j)))))
 
 (provide 
  neo4j-init 
