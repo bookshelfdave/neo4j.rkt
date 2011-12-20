@@ -267,22 +267,32 @@
                     (regexp-split #rx"/" (hash-ref (car nr) 'end)))))))
 
 (test-case
- "Create Node Index"
- 1)
+ "Create Node Index" 
+ (let* ([props (hash 'foo 1 'bar "two")]
+        [node (create-node conn props)]
+        [nodeid (get-node-id node)])        
+        (begin
+          (index-node conn "test-idx1" nodeid (symbol->string 'foo))                              
+          (check-true (hash-has-key? (get-node-indexes conn) 'test-idx1)))))
+   
 
-(test-case
- "Create Relationship Index"
- 1)
 
-(test-case 
- "Get Node Indexes"
- (get-node-indexes conn)
- )
+;(test-case
+; "Create Relationship Index"
+; ; (index-rel n4j idxname relid k)
+; 1)
 
-(test-case
- "Get Relationship Indexes" 
- (get-rel-indexes conn)
- )
+
+;(test-case 
+ ;"Get Node Indexes"
+ ;(get-node-indexes conn)
+ ;)
+
+
+;(test-case
+; "Get Relationship Indexes" 
+; (get-rel-indexes conn)
+; )
 
  ;delete-node-index
  ;delete-rel-index

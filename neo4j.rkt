@@ -7,6 +7,7 @@
 ; no transaction support :-(
 ; need a get_rel_id fn
 
+
 (struct neo4j-server (baseurl 
                       node 
                       node_index 
@@ -738,6 +739,9 @@
  
  delete-node-index
  delete-rel-index
+ 
+ index-node
+ 
  (struct-out neo4j-server))
 
 
